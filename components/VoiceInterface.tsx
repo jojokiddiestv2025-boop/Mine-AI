@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { decodeBase64, encodeBase64 } from '../services/gemini';
@@ -49,7 +48,7 @@ const VoiceInterface: React.FC = () => {
           },
           onmessage: async (message: LiveServerMessage) => {
             if (message.serverContent?.outputTranscription) {
-              const text = message.serverContent.outputTranscription.text;
+              const text = message.serverContent.outputTranscription.text || '';
               setTranscriptions(prev => {
                 const last = prev[prev.length - 1];
                 if (last?.role === 'AI') {
@@ -59,7 +58,7 @@ const VoiceInterface: React.FC = () => {
               });
             }
             if (message.serverContent?.inputTranscription) {
-              const text = message.serverContent.inputTranscription.text;
+              const text = message.serverContent.inputTranscription.text || '';
               setTranscriptions(prev => {
                 const last = prev[prev.length - 1];
                 if (last?.role === 'You') {
@@ -89,7 +88,9 @@ const VoiceInterface: React.FC = () => {
             }
 
             if (message.serverContent?.interrupted) {
-              sourcesRef.current.forEach(s => s.stop());
+              sourcesRef.current.forEach(s => {
+                try { s.stop(); } catch(e) {}
+              });
               sourcesRef.current.clear();
               nextStartTimeRef.current = 0;
             }
