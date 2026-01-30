@@ -22,14 +22,14 @@
       font-family: 'Plus Jakarta Sans', sans-serif;
       color: #f8fafc;
       overflow-x: hidden;
-      overflow-y: auto; /* Global Scroll Enabled */
+      overflow-y: auto;
     }
     .bg-grid {
       background-image: 
         linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px),
         linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px);
       background-size: 40px 40px;
-      position: fixed; /* Keep background static during scroll */
+      position: fixed;
       inset: 0;
       z-index: -10;
     }
@@ -41,7 +41,6 @@
     .glow-indigo {
       box-shadow: 0 0 25px var(--indigo-glow);
     }
-    /* Elite Global Scrollbar */
     ::-webkit-scrollbar {
       width: 10px;
     }
@@ -67,17 +66,19 @@
       will-change: transform;
     }
   </style>
-  <script type="importmap">
-  {
-    "imports": {
-      "react": "https://esm.sh/react@^19.2.4",
-      "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-      "react/": "https://esm.sh/react@^19.2.4/",
-      "firebase/": "https://esm.sh/firebase@^12.8.0/",
-      "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
-    }
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
-  </script>
+}
+</script>
 </head>
 <body class="selection:bg-indigo-500 selection:text-white">
   <div class="bg-grid"></div>
@@ -85,10 +86,13 @@
     <div id="glow-1" class="parallax-glow absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 blur-[120px] rounded-full animate-pulse-slow"></div>
     <div id="glow-2" class="parallax-glow absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 blur-[120px] rounded-full animate-pulse-slow delay-1000"></div>
   </div>
+  
   <div id="root"></div>
 
+  <!-- Entry Point for Vite -->
+  <script type="module" src="/index.tsx"></script>
+
   <script>
-    // Add Parallax movement on scroll
     window.addEventListener('scroll', () => {
       const scrolled = window.scrollY;
       const g1 = document.getElementById('glow-1');
