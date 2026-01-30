@@ -1,0 +1,8 @@
+{
+  "name": "Mine AI: The Ultimate Omnibot",
+  "description": "A world-class AI suite powered by Gemini, featuring high-reasoning chat, instant lite responses, and advanced image editing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
