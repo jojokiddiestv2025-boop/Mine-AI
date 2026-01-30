@@ -6,7 +6,8 @@ import { MATH_BANK, SPELLING_BANK, BankQuestion } from "./questionsBank";
  * Creates a fresh AI instance. 
  * Re-instantiating right before calls ensures we always use the latest injected API key.
  */
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+// Use process.env.API_KEY directly as required by the coding guidelines.
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const activeSessions = new Map<string, Chat>();
 
@@ -17,8 +18,15 @@ export const handleGeminiError = async (error: any) => {
   const errorMessage = error?.message || String(error);
   console.error("Mine AI System Error:", errorMessage);
 
-  // If quota is exceeded (429) or entity not found, prompt the user for an API key to maintain "Unlimited" status.
-  if (errorMessage.includes("429") || errorMessage.includes("Requested entity was not found")) {
+  // If quota is exceeded (429), auth failed (401/403), or entity not found, 
+  // prompt the user for an API key to maintain "Unlimited" status.
+  if (
+    errorMessage.includes("429") || 
+    errorMessage.includes("401") || 
+    errorMessage.includes("403") || 
+    errorMessage.includes("Requested entity was not found") ||
+    errorMessage.includes("API_KEY_INVALID")
+  ) {
     if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
       await window.aistudio.openSelectKey();
     }

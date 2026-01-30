@@ -19,15 +19,6 @@ export interface Message {
   };
 }
 
-export interface ChatSession {
-  id: string;
-  userId: string;
-  title: string;
-  lastMessage: string;
-  updatedAt: number;
-  createdAt: number;
-}
-
 export interface CompetitionType {
   id: 'math' | 'spelling';
   name: string;

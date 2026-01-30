@@ -1,17 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { doc, collection, addDoc, updateDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
+import { auth } from '../services/firebase';
 import { getPersistentChat, generateSpeech, playRawPCM, handleGeminiError } from '../services/gemini';
 import { Message } from '../types';
 
-interface ChatInterfaceProps {
-  chatId: string | null;
-  onChatCreated: (id: string) => void;
-}
-
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) => {
+const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'assistant', content: 'MINE AI synchronized. Global web sensors optimized. Cognition engine primed for high-level operations. State your objective.', timestamp: Date.now() }
   ]);
@@ -25,35 +19,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const user = auth.currentUser;
-
-  useEffect(() => {
-    if (!chatId || !user) {
-      setMessages([{ id: '1', role: 'assistant', content: 'MINE AI synchronized. Global web sensors optimized. State your objective.', timestamp: Date.now() }]);
-      return;
-    }
-
-    const q = query(
-      collection(db, 'chats', chatId, 'messages'),
-      orderBy('timestamp', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const history = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return { 
-          id: doc.id, 
-          ...data,
-          // Handle Firestore Timestamps safely for the UI
-          timestamp: data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp || Date.now())
-        } as Message;
-      });
-      if (history.length > 0) {
-        setMessages(history);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [chatId, user]);
+  const sessionId = useRef(`session-${Date.now()}`);
 
   useEffect(() => {
     const handleGlobalScroll = () => {
@@ -105,34 +71,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
     }
   };
 
-  const saveMessageToFirestore = async (cid: string, msg: Message) => {
-    if (!user) return;
-    await addDoc(collection(db, 'chats', cid, 'messages'), {
-      ...msg,
-      timestamp: new Date(msg.timestamp) // Store as Date for Firestore
-    });
-    await updateDoc(doc(db, 'chats', cid), {
-      lastMessage: msg.content.substring(0, 50),
-      updatedAt: Date.now()
-    });
-  };
-
   const handleSend = async () => {
     if ((!input.trim() && !attachment) || isLoading || !user) return;
-
-    let activeChatId = chatId;
-    
-    if (!activeChatId) {
-      const newChatRef = await addDoc(collection(db, 'chats'), {
-        userId: user.uid,
-        title: input.substring(0, 30) || 'Neural Data Pulse',
-        lastMessage: '',
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      });
-      activeChatId = newChatRef.id;
-      onChatCreated(activeChatId);
-    }
 
     const isImage = attachment?.mimeType.startsWith('image/');
     const userMsg: Message = {
@@ -144,7 +84,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
     };
 
     setMessages(prev => [...prev, userMsg]);
-    await saveMessageToFirestore(activeChatId, userMsg);
     
     const currentInput = input;
     const currentAttachment = attachment;
@@ -155,11 +94,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
     setIsLoading(true);
 
     try {
-      const chat = getPersistentChat(activeChatId);
+      const chat = getPersistentChat(sessionId.current);
       let responseText = "";
       
       if (currentAttachment) {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+        const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY || process.env.API_KEY || '' });
         const result = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: {
@@ -185,7 +124,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
       };
       
       setMessages(prev => [...prev, assistantMsg]);
-      await saveMessageToFirestore(activeChatId, assistantMsg);
     } catch (error) {
       handleGeminiError(error).catch(() => {});
     } finally {
@@ -246,7 +184,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
           <div>
             <h2 className="text-xs font-black text-white uppercase tracking-[0.4em] italic">Cognitive Terminal</h2>
             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-              {chatId ? `Active Neural Link: ${chatId.substring(0, 8)}` : 'Omni-File Processing Enabled'}
+              Direct Neural Link Active
             </p>
           </div>
         </div>
@@ -324,7 +262,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder={chatId ? "Continue this conversation..." : "Initialize new neural link..."}
+                  placeholder="Initialize new neural link..."
                   className="flex-1 bg-transparent px-6 py-6 focus:outline-none text-slate-100 placeholder-slate-600 text-lg font-medium"
                 />
                 <button onClick={handleSend} disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-600/30 active:scale-95 disabled:opacity-50">

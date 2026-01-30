@@ -16,7 +16,6 @@ const App: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -28,20 +27,12 @@ const App: React.FC = () => {
 
   const handleModeChange = (mode: AppMode) => {
     setActiveMode(mode);
-    if (mode !== AppMode.CHAT) {
-      setSelectedChatId(null);
-    }
-  };
-
-  const handleSelectChat = (chatId: string | null) => {
-    setSelectedChatId(chatId);
-    setActiveMode(AppMode.CHAT);
   };
 
   const renderContent = () => {
     switch (activeMode) {
       case AppMode.CHAT:
-        return <ChatInterface chatId={selectedChatId} onChatCreated={setSelectedChatId} />;
+        return <ChatInterface />;
       case AppMode.IMAGE:
         return <ImageEditor />;
       case AppMode.LITE:
@@ -49,7 +40,7 @@ const App: React.FC = () => {
       case AppMode.COMPETITION:
         return <CompetitionInterface />;
       default:
-        return <ChatInterface chatId={selectedChatId} onChatCreated={setSelectedChatId} />;
+        return <ChatInterface />;
     }
   };
 
@@ -71,17 +62,13 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-transparent text-slate-200">
-      {/* Sidebar - Visible on LG screens */}
       <div className="hidden lg:block sticky top-0 h-screen">
         <Sidebar 
           activeMode={activeMode} 
           onSelectMode={handleModeChange} 
-          selectedChatId={selectedChatId}
-          onSelectChat={handleSelectChat}
         />
       </div>
       
-      {/* Global Scrollable Main Content */}
       <main className="flex-1 relative bg-slate-950/40 backdrop-blur-sm lg:border-l border-white/5">
         {renderContent()}
       </main>

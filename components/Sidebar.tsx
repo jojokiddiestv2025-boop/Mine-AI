@@ -1,34 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
-import { AppMode, ChatSession } from '../types';
+import { auth } from '../services/firebase';
+import { AppMode } from '../types';
 
 interface SidebarProps {
   activeMode: AppMode;
   onSelectMode: (mode: AppMode) => void;
-  selectedChatId: string | null;
-  onSelectChat: (chatId: string | null) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeMode, onSelectMode, selectedChatId, onSelectChat }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeMode, onSelectMode }) => {
   const user = auth.currentUser;
-  const [chats, setChats] = useState<ChatSession[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-    const q = query(
-      collection(db, 'chats'),
-      where('userId', '==', user.uid),
-      orderBy('updatedAt', 'desc')
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const chatList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession));
-      setChats(chatList);
-    });
-    return () => unsubscribe();
-  }, [user]);
 
   const handleLogout = async () => {
     try { await signOut(auth); } catch (e) { console.error(e); }
@@ -55,18 +37,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMode, onSelectMode, selectedCha
         </div>
       </div>
 
-      <nav className="px-4 space-y-2 mb-6">
+      <nav className="px-4 space-y-2 flex-1">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onSelectMode(item.id)}
             className={`w-full group flex items-center gap-4 px-5 py-4 rounded-2xl transition-all border ${
-              activeMode === item.id && !selectedChatId
+              activeMode === item.id
                 ? 'bg-indigo-600/10 text-white border-indigo-500/30 shadow-[0_10px_30px_rgba(79,70,229,0.1)]' 
                 : 'text-slate-500 border-transparent hover:bg-slate-900/50 hover:text-slate-300'
             }`}
           >
-            <div className={`${activeMode === item.id && !selectedChatId ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'}`}>
+            <div className={`${activeMode === item.id ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'}`}>
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} /></svg>
             </div>
             <div className="text-left">
@@ -76,46 +58,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMode, onSelectMode, selectedCha
           </button>
         ))}
       </nav>
-
-      <div className="flex-1 px-4 overflow-y-auto custom-scrollbar">
-        <div className="flex items-center justify-between px-4 mb-4">
-          <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Neural Archives</h3>
-          <button 
-            onClick={() => onSelectChat(null)}
-            className="p-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 rounded-lg transition-all animate-pulse"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-          </button>
-        </div>
-        
-        <div className="space-y-1">
-          {chats.map((chat) => (
-            <button
-              key={chat.id}
-              onClick={() => onSelectChat(chat.id)}
-              className={`w-full text-left px-4 py-3 rounded-xl transition-all border group ${
-                selectedChatId === chat.id 
-                  ? 'bg-indigo-600/5 border-indigo-500/20 text-slate-100' 
-                  : 'border-transparent text-slate-500 hover:bg-slate-900/40 hover:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-1.5 h-1.5 rounded-full transition-all ${selectedChatId === chat.id ? 'bg-indigo-500 shadow-[0_0_8px_#6366f1]' : 'bg-slate-800'}`}></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate tracking-tight">{chat.title || 'Incomplete Link'}</p>
-                  <p className="text-[9px] text-slate-600 font-medium truncate uppercase tracking-widest mt-0.5">{chat.lastMessage || 'Memory Void'}</p>
-                </div>
-              </div>
-            </button>
-          ))}
-          {chats.length === 0 && (
-            <div className="px-4 py-10 text-center opacity-20 grayscale">
-              <svg className="w-10 h-10 mx-auto text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Archives Empty</p>
-            </div>
-          )}
-        </div>
-      </div>
 
       <div className="p-6 border-t border-white/5 bg-slate-900/10">
         <div className="flex items-center gap-4 mb-6 px-2">
