@@ -19,8 +19,28 @@ export interface Message {
   };
 }
 
+export interface ChatSession {
+  id: string;
+  userId: string;
+  title: string;
+  lastMessage: string;
+  updatedAt: number;
+  createdAt: number;
+}
+
 export interface CompetitionType {
   id: 'math' | 'spelling';
   name: string;
   description: string;
+}
+
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
+  interface Window {
+    aistudio?: AIStudio;
+  }
 }

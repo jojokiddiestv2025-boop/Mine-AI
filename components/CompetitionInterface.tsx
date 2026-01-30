@@ -127,8 +127,8 @@ const CompetitionInterface: React.FC = () => {
       <div className="flex flex-col items-center justify-center h-full space-y-6">
         <div className="w-24 h-24 border-8 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-indigo-400">Synthesizing Elite Questions...</h2>
-          <p className="text-slate-500 text-sm mt-2">Connecting to {region} Database</p>
+          <h2 className="text-2xl font-bold text-indigo-400">Synchronizing Local Neural Bank...</h2>
+          <p className="text-slate-500 text-sm mt-2">Zero-Latency Access Enabled</p>
         </div>
       </div>
     );
@@ -189,7 +189,10 @@ const CompetitionInterface: React.FC = () => {
              <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
                 <div className="bg-indigo-600 h-full transition-all duration-500" style={{width: `${((currentIdx + 1) / questions.length) * 100}%`}}></div>
              </div>
-             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Progress: {currentIdx + 1} / {questions.length}</p>
+             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-2">
+               Progress: {currentIdx + 1} / {questions.length}
+               <span className="text-indigo-400 ml-2">• Neural Cache Active</span>
+             </p>
            </div>
            <div className={`text-3xl font-black font-mono transition-colors ${timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
              {formatTime(timeLeft)}
@@ -327,9 +330,13 @@ const CompetitionInterface: React.FC = () => {
                <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter">Enter the Arena</h3>
                <p className="text-slate-400 mt-2 max-w-sm mx-auto">
                  {activeType === 'math' 
-                  ? '10 Championship-level questions. 15 minutes. Pure logic.' 
-                  : '20 Elite-level words. 10 minutes. Perfection required.'}
+                  ? '10 Championship-level questions. Zero Latency. Pure logic.' 
+                  : '20 Elite-level words. Instant loading. Perfection required.'}
                </p>
+               <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase rounded-full border border-emerald-500/20">
+                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                 Neural Cache Offline Support Ready
+               </div>
              </div>
              <button
                onClick={startTest}

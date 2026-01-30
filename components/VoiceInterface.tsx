@@ -69,7 +69,7 @@ const VoiceInterface: React.FC = () => {
               });
             }
 
-            const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (base64Audio) {
               const data = decodeBase64(base64Audio);
               const dataInt16 = new Int16Array(data.buffer);
@@ -97,8 +97,8 @@ const VoiceInterface: React.FC = () => {
           onerror: (e: any) => {
             console.error('Live API Error:', e);
             if (e?.message?.includes("Requested entity was not found")) {
-              if (window.aistudio && typeof (window.aistudio as any).openSelectKey === 'function') {
-                (window.aistudio as any).openSelectKey();
+              if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
+                window.aistudio.openSelectKey();
               }
             }
           },
@@ -115,8 +115,8 @@ const VoiceInterface: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to start session:', err);
       if (err?.message?.includes("Requested entity was not found")) {
-        if (window.aistudio && typeof (window.aistudio as any).openSelectKey === 'function') {
-          await (window.aistudio as any).openSelectKey();
+        if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
+          await window.aistudio.openSelectKey();
         }
       }
     }

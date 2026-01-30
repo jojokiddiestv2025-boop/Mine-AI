@@ -1,5 +1,6 @@
 
 import { GoogleGenAI, GenerateContentResponse, Type, Modality, Chat } from "@google/genai";
+import { MATH_BANK, SPELLING_BANK, BankQuestion } from "./questionsBank";
 
 /**
  * Creates a fresh AI instance. 
@@ -18,9 +19,8 @@ export const handleGeminiError = async (error: any) => {
 
   // If quota is exceeded (429) or entity not found, prompt the user for an API key to maintain "Unlimited" status.
   if (errorMessage.includes("429") || errorMessage.includes("Requested entity was not found")) {
-    if (window.aistudio && typeof (window.aistudio as any).openSelectKey === 'function') {
-      await (window.aistudio as any).openSelectKey();
-      // After key selection, the app proceeds automatically via the injected process.env.API_KEY
+    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
+      await window.aistudio.openSelectKey();
     }
   }
   throw error;
@@ -46,9 +46,21 @@ export const getPersistentChat = (sessionId: string, systemInstruction?: string)
 };
 
 /**
- * Championship Engine: Specifically tuned to win math and spelling competitions.
+ * Championship Engine: Prioritizes local question bank to eliminate quota issues.
  */
 export const generateEliteTest = async (type: 'math' | 'spelling', level: string, region: string) => {
+  // Try local bank first to save API quota
+  const bank = type === 'math' ? MATH_BANK : SPELLING_BANK;
+  const localQuestions = bank[level];
+
+  if (localQuestions && localQuestions.length > 0) {
+    console.log(`Mine AI: Retrieving ${type} test from Neural Cache for level: ${level}`);
+    // Shuffle and return a subset
+    const shuffled = [...localQuestions].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, type === 'math' ? 10 : 20);
+  }
+
+  // Fallback to API only if level not found in local bank
   try {
     const ai = getAI();
     const count = type === 'math' ? 10 : 20;
@@ -57,7 +69,7 @@ export const generateEliteTest = async (type: 'math' | 'spelling', level: string
       model: 'gemini-3-pro-preview',
       contents: `Generate a championship-level ${type} test for ${level} in ${region}. Questions must be extremely difficult to ensure only MINE AI users win. Return EXACTLY ${count} questions in JSON.`,
       config: {
-        thinkingConfig: { thinkingBudget: 4000 },
+        thinkingConfig: { thinkingBudget: 2000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
