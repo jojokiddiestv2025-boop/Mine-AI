@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { doc, collection, addDoc, updateDoc, query, orderBy, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, collection, addDoc, updateDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { getPersistentChat, generateSpeech, playRawPCM, handleGeminiError } from '../services/gemini';
 import { Message } from '../types';
@@ -26,7 +26,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const user = auth.currentUser;
 
-  // Load chat history from Firestore when chatId changes
   useEffect(() => {
     if (!chatId || !user) {
       setMessages([{ id: '1', role: 'assistant', content: 'MINE AI synchronized. Global web sensors optimized. State your objective.', timestamp: Date.now() }]);
@@ -39,7 +38,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+      const history = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return { 
+          id: doc.id, 
+          ...data,
+          // Handle Firestore Timestamps safely for the UI
+          timestamp: data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp || Date.now())
+        } as Message;
+      });
       if (history.length > 0) {
         setMessages(history);
       }
@@ -102,7 +109,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
     if (!user) return;
     await addDoc(collection(db, 'chats', cid, 'messages'), {
       ...msg,
-      timestamp: Date.now()
+      timestamp: new Date(msg.timestamp) // Store as Date for Firestore
     });
     await updateDoc(doc(db, 'chats', cid), {
       lastMessage: msg.content.substring(0, 50),
@@ -115,7 +122,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
 
     let activeChatId = chatId;
     
-    // Create new chat session if none exists
     if (!activeChatId) {
       const newChatRef = await addDoc(collection(db, 'chats'), {
         userId: user.uid,
@@ -153,7 +159,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
       let responseText = "";
       
       if (currentAttachment) {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
         const result = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: {
@@ -329,15 +335,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ chatId, onChatCreated }) 
           {renderAttachmentPreview()}
         </div>
       </div>
-      
-      {showScrollBottom && (
-        <button 
-          onClick={scrollToBottom}
-          className="fixed bottom-36 right-12 z-50 p-5 bg-indigo-600 text-white rounded-full shadow-[0_0_30px_rgba(79,70,229,0.5)] animate-in fade-in slide-in-from-bottom-4 hover:scale-110 active:scale-90 transition-all"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 13l-7 7-7-7" /></svg>
-        </button>
-      )}
     </div>
   );
 };
