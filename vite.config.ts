@@ -5,7 +5,8 @@ import process from 'node:process';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const apiKey = env.VITE_API_KEY || env.API_KEY || "";
+  // Prioritize the new custom key name, falling back to standard names
+  const apiKey = env.MINE_AI_GATEWAY_KEY || env.VITE_API_KEY || env.API_KEY || "";
 
   return {
     plugins: [react()],
@@ -15,7 +16,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: false,
-      minify: 'esbuild', // Changed from 'terser' to 'esbuild' to fix missing dependency error
+      minify: 'esbuild',
     },
     server: {
       port: 3000,
