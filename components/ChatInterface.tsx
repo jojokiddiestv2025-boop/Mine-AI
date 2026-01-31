@@ -98,7 +98,8 @@ const ChatInterface: React.FC = () => {
       let responseText = "";
       
       if (currentAttachment) {
-        const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY || process.env.API_KEY || '' });
+        // Correct usage of process.env.API_KEY for image tasks
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const result = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: {
