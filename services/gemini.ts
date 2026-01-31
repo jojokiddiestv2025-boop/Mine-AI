@@ -4,10 +4,15 @@ import { MATH_BANK, SPELLING_BANK, BankQuestion } from "./questionsBank";
 
 /**
  * Creates a fresh AI instance. 
- * Re-instantiating right before calls ensures we always use the latest injected API key.
+ * Initializing inside functions ensures we use the most up-to-date environment value.
  */
-// Use process.env.API_KEY directly as required by the coding guidelines.
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAI = () => {
+  const key = process.env.API_KEY;
+  if (!key) {
+    console.warn("Mine AI: API_KEY is missing. Ensure VITE_API_KEY is set in your environment.");
+  }
+  return new GoogleGenAI({ apiKey: key || "" });
+};
 
 const activeSessions = new Map<string, Chat>();
 
@@ -18,8 +23,7 @@ export const handleGeminiError = async (error: any) => {
   const errorMessage = error?.message || String(error);
   console.error("Mine AI System Error:", errorMessage);
 
-  // If quota is exceeded (429), auth failed (401/403), or entity not found, 
-  // prompt the user for an API key to maintain "Unlimited" status.
+  // If quota is exceeded or key is invalid, prompt the user for an API key if the dialog is available.
   if (
     errorMessage.includes("429") || 
     errorMessage.includes("401") || 
@@ -57,18 +61,15 @@ export const getPersistentChat = (sessionId: string, systemInstruction?: string)
  * Championship Engine: Prioritizes local question bank to eliminate quota issues.
  */
 export const generateEliteTest = async (type: 'math' | 'spelling', level: string, region: string) => {
-  // Try local bank first to save API quota
   const bank = type === 'math' ? MATH_BANK : SPELLING_BANK;
   const localQuestions = bank[level];
 
   if (localQuestions && localQuestions.length > 0) {
     console.log(`Mine AI: Retrieving ${type} test from Neural Cache for level: ${level}`);
-    // Shuffle and return a subset
     const shuffled = [...localQuestions].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, type === 'math' ? 10 : 20);
   }
 
-  // Fallback to API only if level not found in local bank
   try {
     const ai = getAI();
     const count = type === 'math' ? 10 : 20;
