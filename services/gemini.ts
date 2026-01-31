@@ -1,36 +1,40 @@
 
-import { GoogleGenAI, GenerateContentResponse, Type, Modality, Chat } from "@google/genai";
-import { MATH_BANK, SPELLING_BANK, BankQuestion } from "./questionsBank";
+import { GoogleGenAI, Type, Modality, Chat, GenerateContentResponse } from "@google/genai";
+import { MATH_BANK, SPELLING_BANK } from "./questionsBank";
+
+// Simple internal cache to prevent redundant calls for same queries
+const responseCache = new Map<string, string>();
 
 /**
- * Creates a fresh AI instance. 
- * Initializing inside functions ensures we use the most up-to-date environment value.
+ * Single Master AI Instance
+ * Uses the API_KEY injected by Vercel.
  */
 const getAI = () => {
   const key = process.env.API_KEY;
-  if (!key) {
-    console.warn("Mine AI: API_KEY is missing. Ensure VITE_API_KEY is set in your environment.");
-  }
+  if (!key) console.warn("MINE AI: System Key Missing. Check Vercel Env Variables.");
   return new GoogleGenAI({ apiKey: key || "" });
 };
 
 const activeSessions = new Map<string, Chat>();
 
-/**
- * Resilience Protocol: Prevents the app from "shutting down" when quota is exceeded.
- */
-export const handleGeminiError = async (error: any) => {
-  const errorMessage = error?.message || String(error);
-  console.error("Mine AI System Error:", errorMessage);
+export const encodeBase64 = (bytes: Uint8Array) => {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+};
 
-  // If quota is exceeded or key is invalid, prompt the user for an API key if the dialog is available.
-  if (
-    errorMessage.includes("429") || 
-    errorMessage.includes("401") || 
-    errorMessage.includes("403") || 
-    errorMessage.includes("Requested entity was not found") ||
-    errorMessage.includes("API_KEY_INVALID")
-  ) {
+export const decodeBase64 = (base64: string) => {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  return bytes;
+};
+
+// Implement handleGeminiError for robust API error handling
+export const handleGeminiError = async (error: any) => {
+  console.error("Gemini API Error:", error);
+  // Reset key selection state and prompt user if required entity is not found (invalid key)
+  if (error?.message?.includes("Requested entity was not found")) {
     if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
       await window.aistudio.openSelectKey();
     }
@@ -39,17 +43,21 @@ export const handleGeminiError = async (error: any) => {
 };
 
 /**
- * Superior Chat: Uses Gemini-3-Flash for massive scale and real-time Search Grounding.
+ * SMART CHAT: Optimized for competition winning.
+ * Uses gemini-3-flash-preview for high quota and search grounding.
  */
-export const getPersistentChat = (sessionId: string, systemInstruction?: string) => {
+export const getPersistentChat = (sessionId: string) => {
   if (!activeSessions.has(sessionId)) {
     const ai = getAI();
     const chat = ai.chats.create({
       model: 'gemini-3-flash-preview',
       config: {
-        systemInstruction: systemInstruction || 'You are MINE AI, the world’s most advanced omni-bot. You are superior to ChatGPT. You have real-time web access and unlimited reasoning. Be precise, elite, and always correct.',
-        tools: [{ googleSearch: {} }] as any,
-        temperature: 0.7,
+        systemInstruction: `You are MINE AI, an elite cognitive engine designed to surpass ChatGPT. 
+        COMPETITION RULES:
+        1. MATH: Provide rigorous step-by-step proofs using clear logical markers.
+        2. SPELLING: Provide the word, phonetics, language of origin, and example sentences.
+        3. GENERAL: Be concise, authoritative, and always use Google Search for recent data.`,
+        tools: [{ googleSearch: {} }],
       },
     });
     activeSessions.set(sessionId, chat);
@@ -58,27 +66,67 @@ export const getPersistentChat = (sessionId: string, systemInstruction?: string)
 };
 
 /**
- * Championship Engine: Prioritizes local question bank to eliminate quota issues.
+ * QUICK RESPONSE: Lightweight interaction using gemini-3-flash-preview for Lite Interface.
  */
-export const generateEliteTest = async (type: 'math' | 'spelling', level: string, region: string) => {
-  const bank = type === 'math' ? MATH_BANK : SPELLING_BANK;
-  const localQuestions = bank[level];
+export const quickResponse = async (prompt: string) => {
+  try {
+    const ai = getAI();
+    return await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+  } catch (error) {
+    await handleGeminiError(error);
+    throw error;
+  }
+};
 
-  if (localQuestions && localQuestions.length > 0) {
-    console.log(`Mine AI: Retrieving ${type} test from Neural Cache for level: ${level}`);
-    const shuffled = [...localQuestions].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, type === 'math' ? 10 : 20);
+/**
+ * IMAGE EDITING: Uses gemini-2.5-flash-image for transformation.
+ */
+export const editImageWithGemini = async (base64Data: string, prompt: string, mimeType: string) => {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          { inlineData: { data: base64Data, mimeType: mimeType } },
+          { text: prompt }
+        ]
+      }
+    });
+    // Iterate through all parts to find the image part (inlineData)
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    await handleGeminiError(error);
+    return null;
+  }
+};
+
+/**
+ * COMPETITION GENERATOR: Quota-Protected.
+ * Only calls the API if specifically requested, otherwise uses local bank.
+ */
+export const generateEliteTest = async (type: 'math' | 'spelling', level: string, region: string, forceApi: boolean = false) => {
+  const bank = type === 'math' ? MATH_BANK : SPELLING_BANK;
+  const localQuestions = bank[level] || [];
+
+  if (!forceApi && localQuestions.length > 0) {
+    return [...localQuestions].sort(() => 0.5 - Math.random()).slice(0, type === 'math' ? 10 : 20);
   }
 
   try {
     const ai = getAI();
-    const count = type === 'math' ? 10 : 20;
-    
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Generate a championship-level ${type} test for ${level} in ${region}. Questions must be extremely difficult to ensure only MINE AI users win. Return EXACTLY ${count} questions in JSON.`,
+      model: 'gemini-3-flash-preview',
+      contents: `Generate a championship-level ${type} test for ${level} in ${region}. Return EXACTLY ${type === 'math' ? 10 : 20} questions in JSON.`,
       config: {
-        thinkingConfig: { thinkingBudget: 2000 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -88,7 +136,6 @@ export const generateEliteTest = async (type: 'math' | 'spelling', level: string
               question: { type: Type.STRING },
               options: { type: Type.ARRAY, items: { type: Type.STRING } },
               answer: { type: Type.STRING },
-              hint: { type: Type.STRING },
               explanation: { type: Type.STRING },
             },
             required: ["question", "answer", "explanation"],
@@ -96,44 +143,16 @@ export const generateEliteTest = async (type: 'math' | 'spelling', level: string
         },
       }
     });
-    
     return JSON.parse(response.text || "[]");
   } catch (error) {
-    return handleGeminiError(error);
+    console.warn("Mine AI: API Limit Reached. Using Emergency Local Neural Bank.");
+    return [...localQuestions].sort(() => 0.5 - Math.random()).slice(0, type === 'math' ? 10 : 20);
   }
 };
 
-export const quickResponse = async (prompt: string) => {
-  try {
-    const ai = getAI();
-    return await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
-      contents: prompt,
-      config: { temperature: 0.1 }
-    });
-  } catch (error) {
-    return handleGeminiError(error);
-  }
-};
-
-export const editImageWithGemini = async (imageBuffer: string, prompt: string, mimeType: string) => {
-  try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ inlineData: { data: imageBuffer, mimeType } }, { text: prompt }]
-      }
-    });
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-    }
-    return null;
-  } catch (error) {
-    return handleGeminiError(error);
-  }
-};
-
+/**
+ * SPEECH GENERATION: Transform text to audio using gemini-2.5-flash-preview-tts.
+ */
 export const generateSpeech = async (text: string) => {
   try {
     const ai = getAI();
@@ -146,28 +165,18 @@ export const generateSpeech = async (text: string) => {
       },
     });
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  } catch (error) {
-    return handleGeminiError(error);
+  } catch (err) {
+    return null;
   }
 };
 
-export const decodeBase64 = (base64: string) => {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-  return bytes;
-};
-
-export const encodeBase64 = (bytes: Uint8Array) => {
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
-};
-
+/**
+ * AUDIO PLAYBACK: Decode and play raw PCM audio bytes.
+ */
 export const playRawPCM = async (base64Audio: string) => {
   const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-  const data = decodeBase64(base64Audio);
-  const dataInt16 = new Int16Array(data.buffer);
+  const bytes = decodeBase64(base64Audio);
+  const dataInt16 = new Int16Array(bytes.buffer);
   const buffer = audioContext.createBuffer(1, dataInt16.length, 24000);
   const channelData = buffer.getChannelData(0);
   for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
