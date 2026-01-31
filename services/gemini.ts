@@ -7,8 +7,11 @@ import { MATH_BANK, SPELLING_BANK } from "./questionsBank";
  * Strictly follows the required security and initialization pattern.
  */
 const getAI = () => {
-  // Always use new GoogleGenAI({apiKey: process.env.API_KEY});
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const key = process.env.API_KEY;
+  if (!key || key === "undefined" || key.trim() === "") {
+    throw new Error("CRITICAL_AUTH_FAILURE: MINE_AI_GATEWAY_KEY not found in environment.");
+  }
+  return new GoogleGenAI({ apiKey: key });
 };
 
 const activeSessions = new Map<string, Chat>();
@@ -96,7 +99,6 @@ export const generateEliteTest = async (type: 'math' | 'spelling', level: string
         },
       }
     });
-    // The GenerateContentResponse object features a text property (not a method, so do not call text())
     return JSON.parse(response.text || "[]");
   } catch (error) {
     return [...localQuestions].sort(() => 0.5 - Math.random()).slice(0, type === 'math' ? 10 : 20);
@@ -158,5 +160,8 @@ export const playRawPCM = async (base64Audio: string) => {
 
 export const handleGeminiError = async (error: any) => {
   console.error("Mine AI Critical Fault:", error);
-  return; // Silent fail to maintain UI continuity
+  if (error?.message?.includes('AUTH_FAILURE')) {
+     return "API Key Error: Please configure MINE_AI_GATEWAY_KEY in Netlify settings.";
+  }
+  return "System Error: Neural pathways interrupted. Retrying link...";
 };

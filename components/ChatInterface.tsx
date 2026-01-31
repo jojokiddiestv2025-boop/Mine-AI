@@ -14,6 +14,7 @@ const ChatInterface: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<{ data: string, mimeType: string, url: string, name: string } | null>(null);
   const [groundingSources, setGroundingSources] = useState<any[]>([]);
+  const [apiStatus, setApiStatus] = useState<'validating' | 'ready' | 'error'>('validating');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const user = auth.currentUser;
@@ -26,6 +27,16 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    // Quick check to see if API key is defined in the environment
+    const key = process.env.API_KEY;
+    if (!key || key === "undefined") {
+      setApiStatus('error');
+    } else {
+      setApiStatus('ready');
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,8 +82,6 @@ const ChatInterface: React.FC = () => {
       let sources: any[] = [];
 
       if (currentAttachment) {
-        // Multi-modal analysis. Create AI instance right before call for key freshness.
-        // Always use new GoogleGenAI({apiKey: process.env.API_KEY});
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const result = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
@@ -83,13 +92,10 @@ const ChatInterface: React.FC = () => {
             ]
           }
         });
-        // result.text is a property
         responseText = result.text || "";
       } else {
-        // Standard chat with search tools
         const chat = getPersistentChat(sessionId.current);
         const result = await chat.sendMessage({ message: currentInput });
-        // result.text is a property
         responseText = result.text || "";
         sources = result.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       }
@@ -104,7 +110,14 @@ const ChatInterface: React.FC = () => {
       setMessages(prev => [...prev, assistantMsg]);
       setGroundingSources(sources);
     } catch (error) {
-      handleGeminiError(error).catch(() => {});
+      const errorMsg = await handleGeminiError(error);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `### ⚠️ SYSTEM FAULT\n${errorMsg}`,
+        timestamp: Date.now()
+      }]);
+      setApiStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -126,9 +139,14 @@ const ChatInterface: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-slate-950/20">
       <header className="sticky top-0 p-6 flex justify-between items-center bg-slate-950/80 backdrop-blur-xl border-b border-white/5 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-pulse"></div>
-          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white">Cognitive Terminal</h2>
+          <div className={`w-2.5 h-2.5 rounded-full ${apiStatus === 'ready' ? 'bg-emerald-500 animate-pulse' : apiStatus === 'error' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-slate-500'}`}></div>
+          <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white">
+            {apiStatus === 'ready' ? 'Neural Link: Secure' : apiStatus === 'error' ? 'Neural Link: Disconnected' : 'Establishing Handshake...'}
+          </h2>
         </div>
+        {apiStatus === 'error' && (
+           <p className="text-[10px] text-red-400 font-black uppercase tracking-widest hidden md:block">Check MINE_AI_GATEWAY_KEY in Netlify Settings</p>
+        )}
       </header>
 
       <div className="flex-1 p-6 md:p-12 space-y-10 max-w-5xl mx-auto w-full pb-44">
@@ -137,14 +155,14 @@ const ChatInterface: React.FC = () => {
             <div className={`max-w-[90%] rounded-[2.5rem] px-8 py-7 shadow-2xl border ${
               m.role === 'user' 
                 ? 'bg-indigo-600 border-indigo-400/30 text-white rounded-tr-none' 
-                : 'bg-slate-900 border-white/5 text-slate-200 rounded-tl-none'
+                : m.content.includes('SYSTEM FAULT') ? 'bg-red-950/20 border-red-500/30 text-red-200' : 'bg-slate-900 border-white/5 text-slate-200 rounded-tl-none'
             }`}>
               {m.imageUrl && (
                 <img src={m.imageUrl} className="rounded-2xl mb-6 border border-white/10 max-h-80 w-auto" alt="Uploaded" />
               )}
-              <div className="prose prose-invert max-w-none text-base md:text-lg leading-relaxed">{m.content}</div>
+              <div className="prose prose-invert max-w-none text-base md:text-lg leading-relaxed whitespace-pre-wrap">{m.content}</div>
               
-              {m.role === 'assistant' && (
+              {m.role === 'assistant' && !m.content.includes('SYSTEM FAULT') && (
                 <div className="mt-6 flex flex-wrap gap-4 items-center">
                   <button onClick={() => handleSpeech(m.content, m.id)} disabled={!!isSpeaking} className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-2">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z" /></svg>
@@ -156,7 +174,6 @@ const ChatInterface: React.FC = () => {
           </div>
         ))}
 
-        {/* Render Grounding Sources for Google Search transparency as required */}
         {groundingSources.length > 0 && (
           <div className="animate-in fade-in slide-in-from-bottom-2">
             <div className="bg-slate-900/50 border border-white/5 rounded-3xl p-6 max-w-2xl">
@@ -206,7 +223,7 @@ const ChatInterface: React.FC = () => {
               </button>
             </div>
           )}
-          <div className="flex items-center gap-3 bg-slate-900/50 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-2 shadow-2xl focus-within:border-indigo-500/50 transition-all">
+          <div className={`flex items-center gap-3 bg-slate-900/50 backdrop-blur-2xl border ${apiStatus === 'error' ? 'border-red-500/40' : 'border-white/10'} rounded-[2rem] p-2 shadow-2xl focus-within:border-indigo-500/50 transition-all`}>
             <button onClick={() => fileInputRef.current?.click()} className="p-4 text-slate-500 hover:text-indigo-400 transition-colors">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
             </button>
@@ -214,12 +231,13 @@ const ChatInterface: React.FC = () => {
             <input
               type="text"
               value={input}
+              disabled={apiStatus === 'error'}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Initialize neural link..."
-              className="flex-1 bg-transparent px-4 py-4 focus:outline-none text-white placeholder-slate-600"
+              placeholder={apiStatus === 'error' ? "LINK DOWN: CHECK ENVIRONMENT KEYS" : "Initialize neural link..."}
+              className="flex-1 bg-transparent px-4 py-4 focus:outline-none text-white placeholder-slate-600 disabled:opacity-50"
             />
-            <button onClick={handleSend} disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] transition-all disabled:opacity-50">
+            <button onClick={handleSend} disabled={isLoading || apiStatus === 'error'} className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] transition-all disabled:opacity-50">
               Transmit
             </button>
           </div>
