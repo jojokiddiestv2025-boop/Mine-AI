@@ -6,11 +6,14 @@ declare namespace NodeJS {
 }
 
 declare global {
+  // Define AIStudio interface to ensure property declarations on window.aistudio match across different declarations.
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
-    aistudio?: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
+    aistudio?: AIStudio;
   }
 }
 

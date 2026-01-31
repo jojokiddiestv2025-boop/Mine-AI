@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: false,
-      minify: 'terser',
+      minify: 'esbuild', // Changed from 'terser' to 'esbuild' to fix missing dependency error
     },
     server: {
       port: 3000,
