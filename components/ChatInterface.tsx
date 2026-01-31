@@ -72,7 +72,8 @@ const ChatInterface: React.FC = () => {
 
       if (currentAttachment) {
         // Multi-modal analysis. Create AI instance right before call for key freshness.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+        // Always use new GoogleGenAI({apiKey: process.env.API_KEY});
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const result = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: {
@@ -82,11 +83,13 @@ const ChatInterface: React.FC = () => {
             ]
           }
         });
+        // result.text is a property
         responseText = result.text || "";
       } else {
         // Standard chat with search tools
         const chat = getPersistentChat(sessionId.current);
         const result = await chat.sendMessage({ message: currentInput });
+        // result.text is a property
         responseText = result.text || "";
         sources = result.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
       }
