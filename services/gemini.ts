@@ -8,9 +8,13 @@ import { MATH_BANK, SPELLING_BANK } from "./questionsBank";
  */
 const getAI = () => {
   const key = process.env.API_KEY;
-  if (!key || key === "undefined" || key.trim() === "") {
-    throw new Error("CRITICAL_AUTH_FAILURE: MINE_AI_GATEWAY_KEY not found in environment.");
+  
+  // Robust check for missing or invalid keys injected by build tools
+  if (!key || key === "undefined" || key === "" || key === "null") {
+    console.error("MINE AI AUTH ERROR: process.env.API_KEY is missing. Check MINE_AI_GATEWAY_KEY in Netlify dashboard.");
+    throw new Error("CRITICAL_AUTH_FAILURE: Neural gateway key not found. Ensure environment variables are configured.");
   }
+  
   return new GoogleGenAI({ apiKey: key });
 };
 
@@ -101,6 +105,7 @@ export const generateEliteTest = async (type: 'math' | 'spelling', level: string
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
+    console.warn("API Generation Failed, falling back to local vault.", error);
     return [...localQuestions].sort(() => 0.5 - Math.random()).slice(0, type === 'math' ? 10 : 20);
   }
 };
@@ -160,8 +165,12 @@ export const playRawPCM = async (base64Audio: string) => {
 
 export const handleGeminiError = async (error: any) => {
   console.error("Mine AI Critical Fault:", error);
-  if (error?.message?.includes('AUTH_FAILURE')) {
-     return "API Key Error: Please configure MINE_AI_GATEWAY_KEY in Netlify settings.";
+  const msg = error?.message || "";
+  if (msg.includes('AUTH_FAILURE') || msg.includes('API_KEY_INVALID')) {
+     return "API Key Error: Authentication failed. Please check MINE_AI_GATEWAY_KEY in Netlify settings.";
+  }
+  if (msg.includes('quota')) {
+    return "System Overload: Quota exceeded. Please wait a few moments.";
   }
   return "System Error: Neural pathways interrupted. Retrying link...";
 };
